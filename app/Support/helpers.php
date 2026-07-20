@@ -39,12 +39,20 @@ namespace VMP\Support {
      */
     function get_current_vendor_id(): int
     {
-        global $wpdb;
+        // أولاً، تأكد من وجود جلسة مستخدم
         $user_id = get_current_user_id();
         if (!$user_id) {
             return 0;
         }
 
+        // 1) Try user meta first (set during registration/login flows)
+        $meta_vendor_id = (int) get_user_meta($user_id, 'vmp_vendor_id', true);
+        if ($meta_vendor_id > 0) {
+            return $meta_vendor_id;
+        }
+
+        // 2) Fallback to DB lookup
+        global $wpdb;
         $id = $wpdb->get_var($wpdb->prepare(
             "SELECT id FROM {$wpdb->prefix}vmp_vendors WHERE user_id = %d LIMIT 1",
             $user_id
@@ -99,6 +107,11 @@ namespace VMP\Support {
     function require_vendor(bool $require_approved = false): void
     {
         if (!is_user_logged_in()) {
+            // تسجيل تشخيصي لمشكلة الجلسة إذا كانت تحدث
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('[VMP][AUTH] require_vendor: user not logged in. cookies=' . json_encode(array_keys($_COOKIE ?? [])));
+            }
+
             $current_url = home_url($_SERVER['REQUEST_URI'] ?? '/');
             wp_redirect(wp_login_url($current_url));
             exit;
@@ -106,6 +119,12 @@ namespace VMP\Support {
 
         $vendor_id = get_current_vendor_id();
         if (!$vendor_id) {
+            // تسجيل سبب الرفض للمساعدة في التشخيص
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                $meta_vid = (int) get_user_meta(get_current_user_id(), 'vmp_vendor_id', true);
+                error_log('[VMP][AUTH] require_vendor: vendor not found for user ' . get_current_user_id() . '. meta_vmp_vendor_id=' . $meta_vid);
+            }
+
             $settings = get_option('vmp_settings', []);
             $register_page_id = !empty($settings['display']['register_page']) ? (int) $settings['display']['register_page'] : 0;
             $register_page = $register_page_id && get_post($register_page_id)
