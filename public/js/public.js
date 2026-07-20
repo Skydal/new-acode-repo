@@ -275,13 +275,13 @@
 
             $('.vmp-loading').addClass('show');
             $.post(vmp_public.ajax_url, {
-                action: 'vmp_upgrade_plan',
+                action: 'vmp_request_plan_change',
                 nonce: vmp_public.nonce,
                 plan_id: planId
             }, function (res) {
                 $('.vmp-loading').removeClass('show');
-                if (res.success) { VMP.showNotice(res.data.message, 'success'); setTimeout(() => location.reload(), 1500); }
-                else { VMP.showNotice(res.data.message, 'error'); }
+                if (res.success) { VMP.showNotice(res.data.message || res.message || 'تم إرسال الطلب', 'success'); }
+                else { VMP.showNotice(res.data.message || vmp_public.strings.error, 'error'); }
             });
         },
 
