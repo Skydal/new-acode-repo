@@ -227,7 +227,7 @@ class SubscriptionController extends BaseController
     /**
      * جلب طلبات تغيير الخطة المعلقة (للمشرف)
      */
-    public function adminGetPendingPlanChanges(AdminCreatePlanRequest $request): ApiResponse
+    public function adminGetPendingPlanChanges(): ApiResponse
     {
         $pending = $this->subscriptionService->getAllPendingPlanChanges();
 
