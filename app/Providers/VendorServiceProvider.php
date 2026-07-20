@@ -161,6 +161,8 @@ class VendorServiceProvider extends ServiceProvider
             // إذا لم يتم تمرير slug عبر الشورت كود، نأخذه من query_var
             if (empty($atts['slug'])) {
                 $atts['slug'] = get_query_var('vendor_store', '');
+            } elseif (!empty($atts['id'])) {
+                $vendor = $vendor_repo->find((int) $atts['id']);
             }
 
             $vendor_repo = $this->container->make(VendorRepositoryInterface::class);
@@ -304,6 +306,13 @@ class VendorServiceProvider extends ServiceProvider
                     'prev'           => __('السابق', 'vmp'),
                     'submit'         => __('إرسال الطلب', 'vmp'),
                 ],
+            ]);
+
+            // ─── 10. Ensure REST API settings are available for wp.media on frontend ───
+            // Some themes/plugins may not print wpApiSettings in frontend; provide fallback
+            wp_localize_script('vmp-public', 'wpApiSettings', [
+                'root'  => esc_url_raw(rest_url()),
+                'nonce' => wp_create_nonce('wp_rest'),
             ]);
         });
     }
