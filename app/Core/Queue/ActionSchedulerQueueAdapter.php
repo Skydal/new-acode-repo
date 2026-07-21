@@ -75,7 +75,17 @@ class ActionSchedulerQueueAdapter implements QueueInterface
             if (method_exists($jobClass, 'fromPayload')) {
                 $jobInstance = call_user_func([$jobClass, 'fromPayload'], $jobPayload);
             } else {
-                $jobInstance = new $jobClass($jobPayload);
+                // Prefer DI container creation if available via global container helper to allow dependencies injection
+                try {
+                    if (function_exists('vmp_container')) {
+                        $jobInstance = vmp_container()->make($jobClass);
+                    } else {
+                        $jobInstance = new $jobClass($jobPayload);
+                    }
+                } catch (\Throwable $e) {
+                    $this->logger->error('Failed to instantiate ActionScheduler job', ['job_class' => $jobClass, 'error' => $e->getMessage()]);
+                    return;
+                }
             }
 
             if (!($jobInstance instanceof JobInterface)) {
