@@ -3,6 +3,8 @@ namespace VMP\Core\Queue;
 
 defined('ABSPATH') || exit;
 
+use JsonException;
+
 /**
  * Class Job
  *
@@ -23,12 +25,15 @@ class Job
 
     /**
      * بناء نموذج من كائن صف قاعدة البيانات
+     *
+     * @throws JsonException إذا كان الـ payload غير صالح JSON
      */
     public static function fromDbRow(object $row): self
     {
         $payload = [];
         if (!empty($row->payload)) {
-            $decoded = json_decode($row->payload, true);
+            // Use strict JSON decoding to detect corrupt payloads
+            $decoded = json_decode($row->payload, true, 512, JSON_THROW_ON_ERROR);
             if (is_array($decoded)) {
                 $payload = $decoded;
             }
