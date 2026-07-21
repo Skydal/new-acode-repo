@@ -96,13 +96,7 @@ class QueueManager
             if (method_exists($jobClass, 'fromPayload')) {
                 $jobInstance = call_user_func([$jobClass, 'fromPayload'], $job->payload);
             } else {
-                // حاول إنشاء الكلاس عبر الحاوية أو مباشرة
-                try {
-                    $jobInstance = $this->container->make($jobClass);
-                } catch (\Throwable $e) {
-                    // Fallback: attempt direct instantiation if container cannot
-                    $jobInstance = new $jobClass($job->payload);
-                }
+                $jobInstance = $this->container->make($jobClass);
             }
 
             if (!$jobInstance instanceof JobInterface) {
@@ -112,7 +106,8 @@ class QueueManager
             // تنفيذ الوظيفة
             $jobInstance->handle();
 
-            // إزالة الوظيفة بعد النجاح للحفاظ على حجم قاعدة البيانات
+            // مسح الوظيفة بعد النجاح للحفاظ على حجم قاعدة البيانات، أو تحديث حالتها لـ completed
+            // سنقوم بتحديث الحالة إلى completed لتوفير سجل للعمليات
             $this->markAsCompleted($job);
             return true;
 
@@ -136,7 +131,9 @@ class QueueManager
      */
     private function claimJobs(int $limit): array
     {
+        // 1. تحديد المعرفات للوظائف الجاهزة
         // Select jobs that are pending and whose locked_at has passed (or never locked)
+        // This allows us to set locked_at in the future to implement backoff retries.
         $sql = "SELECT id FROM {$this->table}
                 WHERE status = 'pending'
                 AND (locked_at IS NULL OR locked_at <= %s)
@@ -153,14 +150,14 @@ class QueueManager
         // تحويل المعرفات لقائمة مفصولة بفاصلة
         $idsCsv = implode(',', array_map('intval', $jobIds));
 
-        // قفل الوظائف: وضعها قيد المعالجة وتحديث attempts
+        // 2. قفل الوظائف
         $lockSql = "UPDATE {$this->table}
                     SET status = 'processing', locked_at = %s, attempts = attempts + 1
                     WHERE id IN ($idsCsv)";
-
+        
         $this->db->query($this->db->prepare($lockSql, $now));
 
-        // استدعاء بيانات الوظائف المقفلة
+        // 3. استدعاء بيانات الوظائف المقفلة
         $fetchSql = "SELECT * FROM {$this->table} WHERE id IN ($idsCsv)";
         $rows = $this->db->get_results($fetchSql);
 
@@ -188,14 +185,14 @@ class QueueManager
     {
         $maxAttempts = 3;
 
-        // إذا وصلت لمحاولات قصوى، وسم الوظيفة بالفشل النهائي
+        // If we've reached max attempts mark as failed permanently
         if ($job->attempts >= $maxAttempts) {
             $this->db->update(
                 $this->table,
                 [
-                    'status'        => 'failed',
+                    'status' => 'failed',
                     'error_message' => $error,
-                    'locked_at'     => null,
+                    'locked_at' => null,
                 ],
                 ['id' => $job->id]
             );
@@ -215,9 +212,9 @@ class QueueManager
         $this->db->update(
             $this->table,
             [
-                'status'        => 'pending',
+                'status' => 'pending',
                 'error_message' => $error,
-                'locked_at'     => $availableAt,
+                'locked_at' => $availableAt,
             ],
             ['id' => $job->id]
         );
