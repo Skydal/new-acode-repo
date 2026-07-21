@@ -206,11 +206,11 @@ class VendorServiceProvider extends ServiceProvider
     }
 
     /**
-     * تحميل أصول الإضافة (CSS/JS) – النسخة النهائية المحسّنة
-     * ✅ تحميل wp_enqueue_media() شرطياً (فقط في صفحات رفع الملفات)
+     * تحميل أصول الإضافة (CSS/JS) – النسخة النهائية المحسنة
+     * ✅ تحميل wp_enqueue_media() شرطياً (فقط في صفحات رفع الملفات أو في أي صفحة VMP)
      * ✅ تحميل vendor-products.js شرطياً (فقط في صفحة المنتجات)
      * ✅ كائن JS واحد يحتوي كل شيء (vmp_public)
-     * ✅ nonce واحد للتطبيقات العامة (vmp_public.nonce)
+     * ✅ nonce واحد للتطبيق العامة (vmp_public.nonce)
      * ✅ nonce خاص للتسجيل (vmp_public.register_nonce) لحل مشكلة التسجيل
      * ✅ يدعم Page Builders عبر GLOBALS['vmp_is_active']
      * ✅ يدعم جميع أنواع الـ permalinks عبر GLOBALS['vmp_current_page']
@@ -244,11 +244,9 @@ class VendorServiceProvider extends ServiceProvider
             $current_page = $GLOBALS['vmp_current_page'] 
                 ?? sanitize_key($_GET['vmp_page'] ?? 'dashboard');
 
-            // ─── 5. تحميل wp_enqueue_media() شرطياً (فقط عند الحاجة) ───
-            $pages_needing_media = ['add-product', 'edit-product', 'profile', 'ai-create-product'];
-            if (in_array($current_page, $pages_needing_media, true)) {
-                wp_enqueue_media();
-            }
+            // ─── 5. Force load wp_enqueue_media() for any VMP page to avoid missing media scripts
+            // Some themes or page builders might not print required REST settings; we also provide a fallback below.
+            wp_enqueue_media();
 
             // ─── 6. تحميل ملفات التصميم (CSS) ───
             wp_enqueue_style(
